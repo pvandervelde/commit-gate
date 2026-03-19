@@ -3,6 +3,7 @@
 ## ConfigLoader
 
 **Responsibilities:**
+
 - Knows: the config file discovery algorithm (walk up from cwd)
 - Knows: the TOML schema for `.commitgate.toml`
 - Knows: default values for all optional fields
@@ -11,9 +12,11 @@
 - Does: merges defaults with user-specified values
 
 **Collaborators:**
+
 - Pipeline (provides the parsed configuration)
 
 **Roles:**
+
 - Parser: translates TOML into internal configuration types
 - Validator: rejects invalid configurations before any checks run
 
@@ -22,6 +25,7 @@
 ## Pipeline
 
 **Responsibilities:**
+
 - Knows: the ordered sequence of checks to execute
 - Knows: whether to fail-fast or run all checks
 - Knows: the active mode (if any) and its path restrictions
@@ -31,20 +35,23 @@
 - Does: enforces per-check timeouts
 
 **Collaborators:**
+
 - ConfigLoader (provides check sequence and mode)
 - Check implementations (delegates validation to each check)
 - StagedFiles (provides the list of files to validate)
 - OutputFormatter (passes gate result for rendering)
 
 **Roles:**
+
 - Orchestrator: coordinates the check execution sequence
 - Aggregator: combines individual check results into a gate result
 
 ---
 
-## StagedFiles
+## StagedFiles (implements FileSource — `--staged` mode)
 
 **Responsibilities:**
+
 - Knows: how to query git for the list of staged files
 - Knows: how to read staged file content (via `git show :path`)
 - Does: provides the list of staged file paths
@@ -52,28 +59,55 @@
 - Does: filters the file list by extension when requested
 
 **Collaborators:**
+
 - Pipeline (provides staged file list and content)
 - PathCheck (provides file paths for validation)
 - StubCheck (provides file content for scanning)
 
 **Roles:**
+
 - Data source: abstracts git staging area access
+
+---
+
+## FilesystemFiles (implements FileSource — `--files` mode)
+
+**Responsibilities:**
+
+- Knows: the explicit list of file paths provided via `--files`
+- Knows: how to read file content from the filesystem (working tree)
+- Does: provides the list of specified file paths
+- Does: provides filesystem file content for pattern scanning
+- Does: filters the file list by extension when requested
+
+**Collaborators:**
+
+- Pipeline (provides file list and content)
+- PathCheck (provides file paths for validation)
+- StubCheck (provides file content for scanning)
+
+**Roles:**
+
+- Data source: abstracts filesystem access for pre-flight (pre-staging) validation
 
 ---
 
 ## PathCheck (built-in)
 
 **Responsibilities:**
+
 - Knows: the writable paths for the active mode
 - Knows: globally allowed paths (docs/, .llm/, etc.)
 - Does: validates each staged file against the allowed path set
 - Does: reports which files violated which path restrictions
 
 **Collaborators:**
+
 - StagedFiles (provides paths to check)
 - Pipeline (receives check result)
 
 **Roles:**
+
 - Validator: enforces path restrictions per mode
 
 ---
@@ -81,16 +115,19 @@
 ## StubCheck (built-in)
 
 **Responsibilities:**
+
 - Knows: the list of stub patterns to scan for (from config)
 - Knows: which file extensions to scan (from config)
 - Does: scans staged file content for stub patterns
 - Does: reports file path, line number, and matched pattern for each hit
 
 **Collaborators:**
+
 - StagedFiles (provides file content to scan)
 - Pipeline (receives check result)
 
 **Roles:**
+
 - Scanner: detects incomplete implementations
 
 ---
@@ -98,14 +135,17 @@
 ## MessageCheck (built-in)
 
 **Responsibilities:**
+
 - Knows: commit message validation rules (min length, format, forbidden patterns)
 - Does: validates a commit message against configured rules
 - Does: reports which specific rule was violated
 
 **Collaborators:**
+
 - Pipeline (receives check result)
 
 **Roles:**
+
 - Validator: enforces commit message quality
 
 ---
@@ -113,6 +153,7 @@
 ## CommandCheck
 
 **Responsibilities:**
+
 - Knows: the shell command template to execute
 - Knows: how to substitute `{files}` with the staged file list
 - Knows: the per-check timeout
@@ -123,10 +164,12 @@
 - Does: kills the subprocess on timeout
 
 **Collaborators:**
+
 - StagedFiles (provides file paths for `{files}` substitution)
 - Pipeline (receives check result)
 
 **Roles:**
+
 - Executor: runs external tools and translates their output into check results
 
 ---
@@ -134,6 +177,7 @@
 ## OutputFormatter
 
 **Responsibilities:**
+
 - Knows: whether to produce human-readable or JSON output
 - Knows: the terminal width and colour support (for human output)
 - Does: renders a gate result as coloured terminal text (human mode)
@@ -141,9 +185,11 @@
 - Does: writes output to stdout only (never stderr for structured output)
 
 **Collaborators:**
+
 - Pipeline (provides gate result to render)
 
 **Roles:**
+
 - Presenter: translates internal results into external representations
 
 ---
@@ -151,6 +197,7 @@
 ## CLI
 
 **Responsibilities:**
+
 - Knows: the command-line interface (subcommands, flags, env vars)
 - Does: parses command-line arguments
 - Does: determines the operating mode (pre-commit hook vs standalone check)
@@ -158,11 +205,13 @@
 - Does: sets the process exit code (0 = pass or success, 1 = check failure, 2 = gate error)
 
 **Collaborators:**
+
 - ConfigLoader (triggers config discovery)
 - Pipeline (triggers check execution)
 - OutputFormatter (triggers output rendering)
 
 **Roles:**
+
 - Entry point: wires all components together and manages the process lifecycle
 
 ---
@@ -170,6 +219,7 @@
 ## McpServer
 
 **Responsibilities:**
+
 - Knows: the MCP stdio protocol (JSON-RPC framing, tool registration)
 - Knows: the `propose_commit` tool schema (accepted inputs, returned shape)
 - Does: starts a stdio MCP server loop that accepts tool-call requests
@@ -179,9 +229,11 @@
 - Does: returns a structured error if the pipeline cannot run (gate error)
 
 **Collaborators:**
+
 - ConfigLoader (provides configuration)
 - Pipeline (runs the check pipeline)
 - GitCli (executes the commit on success)
 
 **Roles:**
+
 - Transport adapter: translates MCP tool-call protocol into pipeline execution and back

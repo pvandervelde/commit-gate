@@ -83,13 +83,17 @@ A file that has been `git add`-ed and is part of the next commit. The gate opera
 ## Agent Integration Concepts
 
 ### MCP Tool
+
 A structured tool interface exposed by `commitgate mcp` (a stdio MCP server). AI agents that support the Model Context Protocol call `propose_commit` as a first-class tool instead of shelling out to `git commit`. The tool runs the full check pipeline and, on success, executes the commit. The agent receives a `GateResult` as the tool return value.
 
 ### `propose_commit`
-The MCP tool name exposed by the gate's MCP server. Accepts `files: string[]` and `message: string`. Returns a `GateResult`. Only calls `git commit` if all checks pass. The agent should call this tool in place of `git commit` when the MCP server is configured.
+
+The MCP tool name exposed by the gate's MCP server. Accepts `files: string[]` and `message: string`. Staging lifecycle: (1) stages the provided files with `git add`; (2) runs the full check pipeline against the staged index; (3a) on success, executes `git commit -m <message>` and returns `GateResult { success: true }`; (3b) on failure or gate error, executes `git restore --staged <files>` to restore the staging area to its pre-call state and returns `GateResult { success: false }` or an MCP error. The repository staging area is always left unchanged relative to its state before the call when the pipeline does not succeed.
 
 ### Git Alias Wrapper
+
 A shell script named `git` placed earlier in `PATH` than the real git binary in an agent's execution environment. Intercepts `git commit` subcommands and runs `commitgate check --staged --json` before delegating to real git. Transparent to the agent — the agent cannot distinguish the wrapper from real git. Not for use on human developer machines.
 
 ### Copilot Skill
+
 A GitHub Copilot Extension or skill definition (`.copilot/skills/commitgate.yaml`) that wraps `commitgate check` as an invocable action for Copilot-based agents. Serves the same purpose as the MCP tool for the Copilot agent framework.

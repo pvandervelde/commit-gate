@@ -10,10 +10,14 @@ Run the check pipeline against staged files or a specified file list.
 commitgate check [OPTIONS]
 
 Options:
-  --staged           Check files in the git staging area (default when no --files)
+  --staged           Check files in the git staging area (default when no --files).
+                     Mutually exclusive with --files. Providing both is a gate error (exit 2).
   --files <FILE>...  Check specific files from the filesystem (working tree). Note: unlike --staged,
                      this reads file content directly from disk, not from the git index. Useful for
-                     pre-flight checks before staging.
+                     pre-flight checks before staging. Mutually exclusive with --staged.
+                     When COMMITGATE_MODE is active, path restrictions apply to the specified files
+                     just as they do for --staged. This makes --files useful for validating a file
+                     list before committing it.
   --message <MSG>    Commit message to validate (for message check). Only relevant when the message
                      check is in the pipeline. When running as a pre-commit hook this flag is not
                      available — use the commit-msg hook integration instead (see `commitgate install`).
@@ -26,11 +30,13 @@ Options:
 ```
 
 **Exit codes:**
+
 - `0` — All checks passed
 - `1` — At least one check failed
 - `2` — Gate error (bad config, missing tool, not in a git repo)
 
 **Examples:**
+
 ```bash
 # Check staged files (typical pre-commit usage)
 commitgate check --staged
@@ -63,6 +69,7 @@ Options:
 ```
 
 **Examples:**
+
 ```bash
 # Create config with Rust defaults
 commitgate init --language rust
@@ -93,6 +100,7 @@ This creates the hook directory, writes the pre-commit hook script that invokes 
 **When to use `--commit-msg`:** The pre-commit hook runs _before_ the commit message is entered by the developer. The message check can only validate the final message in the commit-msg hook, which runs _after_ the developer has typed the message. If your `sequence` includes a `message` check, install both hooks.
 
 **Examples:**
+
 ```bash
 # Install in current repo
 commitgate install
@@ -124,6 +132,7 @@ Options:
 The server reads from stdin and writes to stdout using the MCP JSON-RPC protocol. It should be launched as a subprocess by the agent framework, not run interactively.
 
 **Exposed tool: `propose_commit`**
+
 ```
 Input:
   files:   string[]   — file paths to validate and stage
@@ -139,6 +148,7 @@ Output (GateResult):
 When `success` is `true` the server has already executed `git commit -m <message>`. The agent should not call `git commit` separately.
 
 **Example MCP server config (Claude Code):**
+
 ```json
 {
   "mcpServers": {
@@ -157,7 +167,7 @@ When `success` is `true` the server has already executed `git commit -m <message
 | Variable | Purpose |
 |---|---|
 | `COMMITGATE_MODE` | Active mode name. Enables path restrictions for the named mode. |
-| `NO_COLOR` | When set (any value), disables coloured output. See https://no-color.org/ |
+| `NO_COLOR` | When set (any value), disables coloured output. See <https://no-color.org/> |
 
 ---
 
@@ -177,6 +187,7 @@ BLOCKED: 1 of 3 checks failed (fail-fast: 2 checks skipped)
 ```
 
 With `--verbose`:
+
 ```
 ━━━ commitgate ━━━
 ✓ paths (tester)                    0ms
@@ -195,6 +206,7 @@ BLOCKED: 1 of 5 checks failed. Total: 352ms
 ### JSON Output (default when stdout is not a TTY, or `--json`)
 
 **Success:**
+
 ```json
 {
   "success": true,
@@ -210,6 +222,7 @@ BLOCKED: 1 of 5 checks failed. Total: 352ms
 ```
 
 **Failure:**
+
 ```json
 {
   "success": false,
@@ -230,6 +243,7 @@ BLOCKED: 1 of 5 checks failed. Total: 352ms
 ```
 
 **Gate error (exit code 2, written to stderr):**
+
 ```json
 {
   "error": "Configuration error: unknown check type 'builtin-v2' in check 'paths' (.commitgate.toml line 12)"

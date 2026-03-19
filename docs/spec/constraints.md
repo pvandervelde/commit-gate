@@ -30,8 +30,8 @@
 
 - JSON output to stdout must be a single, complete JSON object — no streaming, no multiple objects, no trailing newlines after the closing brace
 - Human output must be readable in a standard 80-column terminal
-- Colour output must respect the `NO_COLOR` environment variable (see https://no-color.org/)
-- Output truncation (`max_output_lines`) applies to **failing** checks only. Passing checks show brief status text (a single line), not full stdout/stderr, even in verbose mode.
+- Colour output must respect the `NO_COLOR` environment variable (see <https://no-color.org/>)
+- Output truncation (`max_output_lines`) applies to **failing** checks only. Passing checks show brief status text (a single line), not full stdout/stderr, even in verbose mode. In `--verbose` mode, a passing command check shows a single summary line (e.g. "exit 0, 340ms") — the check's captured stdout/stderr is discarded. There is no mode that shows the full stdout of a passing command check.
 - Output truncation must clearly indicate how many lines were omitted
 - The `remediation` field in every failed check must be a complete, imperative sentence that the developer or agent can act on without additional context
 
@@ -45,9 +45,11 @@
 
 ## Git Integration
 
-- The gate reads from the git staging area only — never the working tree
+- The gate reads from the git staging area only — never the working tree — when invoked via `--staged` or as a git hook
+- When invoked via `--files`, the gate reads file content directly from the filesystem (working tree). The git staging area is not used for content-based checks in this mode.
+- `--staged` and `--files` are mutually exclusive. Providing both is a gate error (exit code 2).
 - Staged file content is read via `git show :<path>`, not by reading the filesystem
-- The gate never writes to git (no `git add`, `git commit`, `git reset`, or any write operations)
+- The `commitgate check` command never writes to git (no `git add`, `git commit`, `git reset`, or any write operations). The `commitgate mcp` server does write to git as part of the `propose_commit` operation — see security.md for the constrained write surface.
 - The git binary is assumed to be in PATH. If not found, the gate exits with code 2 and a clear error
 
 ## Configuration

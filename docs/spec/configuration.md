@@ -97,10 +97,14 @@ remediation = "All tests must pass before committing. Fix failing tests."
 
 [modes.tester]
 writable = ["tests"]
+# ADVISORY ONLY — the gate does NOT enforce readonly.
+# This field is documentation for humans; the gate only enforces 'writable'.
+# If you want path restrictions, adjust 'writable', not 'readonly'.
 readonly = ["src", "lib"]
 
 [modes.coder]
 writable = ["src", "lib"]
+# ADVISORY ONLY — see note above
 readonly = ["tests"]
 
 # Paths that are always writable regardless of mode.
@@ -133,7 +137,7 @@ No additional fields. Behaviour is controlled by the active mode.
 | Field | Type | Default | Description |
 |---|---|---|---|
 | `type` | `"pattern-scan"` | required | Must be `"pattern-scan"` |
-| `patterns` | `string[]` | required | Literal strings to search for in staged file content |
+| `patterns` | `string[]` | required | Exact byte sequences to search for in staged file content. **Not regular expressions** — patterns are matched literally. Special regex characters (`.`, `*`, `?`, `[`, etc.) have no special meaning and are matched as-is. |
 | `extensions` | `string[]` | all files | File extensions to scan (e.g. `[".rs", ".ts"]`) |
 | `remediation` | `string` | `""` | Action instruction on failure |
 

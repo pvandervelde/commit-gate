@@ -139,6 +139,26 @@ These assertions are testable specifications. Each maps to one or more tests. Th
 - When: the path check runs
 - Then: `docs/README.md` is accepted (default `always_writable = ["docs", ".llm"]` applies)
 
+### CG-PATH-08: Path check applies to `--files` when a mode is active
+
+- Given: mode `tester` with `writable = ["tests"]`
+- And: `commitgate check --files src/auth.rs --mode tester` is run
+- When: the path check runs
+- Then: the check fails
+- And: the diagnostic lists `src/auth.rs` as the violating file
+- Note: `--files` is useful for pre-flight validation before staging; mode restrictions apply equally
+
+---
+
+## Flag Conflicts
+
+### CG-CHECK-01: Providing both `--staged` and `--files` is a gate error
+
+- Given: `commitgate check --staged --files src/auth.rs` is run
+- When: the gate parses arguments
+- Then: it exits with code 2
+- And: the error message states that `--staged` and `--files` are mutually exclusive
+
 ---
 
 ## Stub Check
@@ -458,6 +478,7 @@ These assertions are testable specifications. Each maps to one or more tests. Th
 ## MCP Tool (`propose_commit`)
 
 ### CG-MCP-01: `propose_commit` runs the pipeline and returns GateResult on failure
+
 - Given: the MCP server is running (`commitgate mcp`)
 - And: a `propose_commit` tool call is received with a valid file list and message
 - And: a check in the pipeline fails
@@ -468,6 +489,7 @@ These assertions are testable specifications. Each maps to one or more tests. Th
 - And: the MCP response exit code is a tool-result (not an MCP error)
 
 ### CG-MCP-02: `propose_commit` commits and returns success when all checks pass
+
 - Given: the MCP server is running
 - And: a `propose_commit` tool call is received with a valid file list and message
 - And: all checks pass
@@ -477,6 +499,7 @@ These assertions are testable specifications. Each maps to one or more tests. Th
 - And: the commit is present in the repository's git history
 
 ### CG-MCP-03: `propose_commit` returns an MCP error on gate error (not a check failure)
+
 - Given: the MCP server is running
 - And: a `propose_commit` tool call is received
 - And: the gate cannot run (e.g. no `.commitgate.toml`, missing tool)
@@ -486,14 +509,33 @@ These assertions are testable specifications. Each maps to one or more tests. Th
 - And: no git commit is executed
 
 ### CG-MCP-04: `propose_commit` does not commit unless pipeline explicitly succeeds
+
 - Given: the pipeline returns a gate error (code 2 equivalent)
 - When: the MCP server processes the result
 - Then: git commit is NOT called under any circumstance
 - Note: this is distinct from a check failure — it tests that the MCP handler has no code path that calls git commit on a non-success result
 
 ### CG-MCP-05: MCP server is usable via stdio
+
 - Given: `commitgate mcp` is launched as a subprocess
 - And: a valid MCP `initialize` request is sent on stdin
 - When: the server processes the request
 - Then: a valid MCP `initialize` response is written to stdout
 - And: the `tools` list includes `propose_commit` with its input schema
+
+### CG-MCP-06: `propose_commit` unstages files on pipeline failure
+
+- Given: the MCP server has staged the specified files (`git add`)
+- And: the check pipeline fails
+- When: the failure result is returned to the caller
+- Then: `git restore --staged <files>` is executed before returning the result
+- And: the repository staging area is in the same state as before the `propose_commit` call
+- And: the agent does not need to manually unstage files
+
+### CG-MCP-07: `propose_commit` unstages files on gate error
+
+- Given: the MCP server has staged the specified files
+- And: a gate error occurs (bad config, missing tool)
+- When: the MCP error response is returned
+- Then: `git restore --staged <files>` is still executed
+- And: the staging area is clean regardless of the error type
