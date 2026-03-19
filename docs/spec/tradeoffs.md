@@ -169,13 +169,16 @@
 ```bash
 #!/usr/bin/env bash
 # /usr/local/bin/git  (wrapper, placed before real git in PATH)
-
-REAL_GIT=$(type -ap git | grep -v "$0" | head -1)
+# IMPORTANT: REAL_GIT must be an absolute path, never a PATH lookup.
+# A PATH lookup would find this wrapper itself and recurse infinitely.
+REAL_GIT=/usr/bin/git
 
 case "$1" in
   commit)
-    commitgate check --staged --json >&2
-    if [ $? -ne 0 ]; then
+    OUTPUT=$(commitgate check --staged --json 2>&1)
+    STATUS=$?
+    if [ $STATUS -ne 0 ]; then
+      echo "$OUTPUT" >&2
       exit 1
     fi
     exec "$REAL_GIT" "$@"

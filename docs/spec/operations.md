@@ -82,6 +82,7 @@ This section covers deployment patterns for AI agent environments. See [tradeoff
 Place a wrapper script named `git` earlier in `PATH` than the real git binary. The wrapper intercepts `git commit`, runs the gate first, and delegates all other commands to real git.
 
 **Dockerfile example:**
+
 ```dockerfile
 # Install commitgate
 RUN curl -L https://github.com/pvandervelde/commit-gate/releases/latest/download/commitgate-x86_64-unknown-linux-musl \
@@ -94,6 +95,7 @@ RUN chmod +x /usr/local/bin/git
 ```
 
 **`git-wrapper.sh`:**
+
 ```bash
 #!/usr/bin/env bash
 # Git wrapper — intercepts 'git commit' and enforces commitgate
@@ -117,6 +119,7 @@ esac
 ```
 
 **Key points:**
+
 - Use an **absolute path** to real git (`/usr/bin/git`) in the wrapper, not a PATH lookup, to avoid infinite recursion
 - Write gate output to **stderr** in the wrapper so it appears alongside the agent's error context
 - The wrapper handles only `commit`; all other subcommands (`status`, `add`, `push`, `log`, etc.) pass through unchanged
@@ -129,6 +132,7 @@ esac
 Run `commitgate mcp` as a stdio MCP server. The agent uses the `propose_commit` tool instead of calling `git commit` directly.
 
 **Claude Code configuration (`.claude/mcp.json` or equivalent):**
+
 ```json
 {
   "mcpServers": {
@@ -142,17 +146,25 @@ Run `commitgate mcp` as a stdio MCP server. The agent uses the `propose_commit` 
 ```
 
 **`propose_commit` tool interface (MCP):**
+
 ```
 Tool: propose_commit
 Input:
-  files:   string[]   — paths to stage and check
+  files:   string[]   — paths to validate (filesystem paths)
   message: string     — commit message
 Output:
   GateResult JSON — success/failure, check results, remediations
-Side-effect on success: git commit is executed by the MCP server
+Side-effects:
+  On invocation: git add <files> (stages the specified files for checking)
+  On success:    git commit -m <message> (creates the commit)
+  On failure:    git restore --staged <files> (unstages the files, restoring
+                 the staging area to its state before the call)
 ```
 
+**Staging lifecycle:** `propose_commit` stages the provided files before running the pipeline so that built-in checks (StubCheck, PathCheck) read from the git index, matching what `commitgate check --staged` does during normal hook usage. If the pipeline fails, the staged files are unstaged (`git restore --staged`) so the repository is left in the same state as before the call. The agent does not need to manually unstage files after a failure.
+
 **Agent self-correction loop:**
+
 ```
 1. Agent calls propose_commit({files: [...], message: "feat: ..."})
 2. Gate fails → agent receives structured GateResult with remediation per check
@@ -234,18 +246,38 @@ commitgate install --global
 
 This sets `git config --global core.hooksPath` to a user-level hooks directory. The gate must be in PATH for this to work across repositories.
 
+**Important:** The gate requires a `.commitgate.toml` in the repository (CG-CFG-02). A globally installed hook on a repository that has no `.commitgate.toml` will fail every commit with exit code 2. Do not use global installation on repositories that are not configured to use the gate. If the gate is invoked globally and no config file is found, it exits with a clear error message explaining the missing config — it does not silently pass.
+
 ---
 
 ## CI Integration
 
 ### GitHub Actions
 
+`commitgate check --staged` looks for files in the git staging area. In a CI pipeline after `git checkout` there are no staged files — the working tree already matches HEAD — so `--staged` would always exit 0 with "No staged files. Nothing to check." (CG-PIPE-05). Use `--files` with a git diff instead:
+
 ```yaml
 - name: Run quality gate
-  run: commitgate check --staged --json
+  run: |
+    # Collect files changed relative to the base ref
+    FILES=$(git diff --name-only origin/${{ github.base_ref }}...HEAD)
+    if [ -n "$FILES" ]; then
+      echo "$FILES" | xargs commitgate check --files --json
+    fi
 ```
 
-In CI, `commitgate check --staged` validates the files modified in the current commit. Combined with `--json`, the output can be parsed for structured reporting.
+Alternatively, for a push-based workflow checking the files in the latest commit:
+
+```yaml
+- name: Run quality gate
+  run: |
+    FILES=$(git diff --name-only HEAD~1 HEAD)
+    if [ -n "$FILES" ]; then
+      echo "$FILES" | xargs commitgate check --files --json
+    fi
+```
+
+`--staged` is appropriate in a pre-commit hook; `--files` is appropriate in CI.
 
 ### Exit Code Handling
 
