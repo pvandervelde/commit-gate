@@ -179,7 +179,7 @@ case "$1" in
     STATUS=$?
     if [ $STATUS -ne 0 ]; then
       echo "$OUTPUT" >&2
-      exit 1
+      exit $STATUS   # preserve exit code: 1=check failure, 2=gate error
     fi
     exec "$REAL_GIT" "$@"
     ;;

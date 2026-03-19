@@ -108,7 +108,7 @@ case "$1" in
     STATUS=$?
     if [ $STATUS -ne 0 ]; then
       echo "$OUTPUT" >&2
-      exit 1
+      exit $STATUS   # preserve exit code: 1=check failure, 2=gate error
     fi
     exec "$REAL_GIT" "$@"
     ;;
@@ -121,6 +121,7 @@ esac
 **Key points:**
 
 - Use an **absolute path** to real git (`/usr/bin/git`) in the wrapper, not a PATH lookup, to avoid infinite recursion
+- Use `exit $STATUS` (not `exit 1`) to preserve the three-exit-code distinction: exit 1 means "a check failed" (the agent should self-correct); exit 2 means "the gate itself is broken" (the agent should alert, not retry). Both cause a non-zero exit from `git commit`, but agents reading the exit code can respond differently.
 - Write gate output to **stderr** in the wrapper so it appears alongside the agent's error context
 - The wrapper handles only `commit`; all other subcommands (`status`, `add`, `push`, `log`, etc.) pass through unchanged
 - Do **not** install this wrapper on human developer machines

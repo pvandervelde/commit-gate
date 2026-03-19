@@ -444,8 +444,9 @@ These assertions are testable specifications. Each maps to one or more tests. Th
 
 - Given: a `.commitgate.toml` already exists
 - When: `commitgate init` is run without `--force`
-- Then: it exits with code 1 and an error message identifying the existing file
+- Then: it exits with code 2 and an error message identifying the existing file
 - And: the existing config is unchanged
+- Note: exit code 2 (gate error), not 1 (check failure) — no checks ran; this is a precondition error
 
 ### CG-INIT-03: `commitgate init --with-modes` includes mode definitions
 
